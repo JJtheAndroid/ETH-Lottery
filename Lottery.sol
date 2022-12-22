@@ -15,15 +15,18 @@ contract Lottery is VRFConsumerBaseV2, ConfirmedOwner {
     event RequestFulfilled(uint256 requestId, uint256[] randomWords);
 
 
+    uint timetopickwinner;
+
+
     //uint to track the last lotto prize
     uint lastlottocount;
     
-    //array to trak prize winnings 
+    //array to track prize winnings 
     uint [] public prizes;
 
-
-    address payable lastwinner;
-
+    //array to track past winners 
+    address payable[] public lastwinners;
+   
    
 
     struct RequestStatus {
@@ -68,13 +71,14 @@ contract Lottery is VRFConsumerBaseV2, ConfirmedOwner {
         );
         s_subscriptionId = subscriptionId;
 
+        timetopickwinner = block.timestamp + 10 minutes;
+
        
     }
 
     // Assumes the subscription is funded sufficiently.
     function requestRandomWords()
-        public
-        onlyOwner
+        internal
         returns (uint256 requestId)
     {
         // Will revert if subscription is not set and funded.
@@ -139,7 +143,6 @@ function GetnumPlayers () public view returns (uint){
 //this function adds the requirement for the lottery and pushes each entry into the players array
 function enter () public payable {
 
-  //uint USDentryprice = (50 * (10**8) /NewPricecontract.newprice());
 
     require(msg.value == 0.05 ether, "You have do not have enough ether");
     players.push(payable(msg.sender));
@@ -150,35 +153,46 @@ function enter () public payable {
 
 
 //this function uses the random number to pick a winner 
-function pickWinner() public onlyOwner {
+function pickWinner() public {
+    require (block.timestamp >= timetopickwinner, "This lotto is not finished yet");
     requestRandomWords();
     prizes.push(address(this).balance);
+    
     uint index = requestRandomWords() % players.length;
   (bool sent,) = players[index].call{value: address(this).balance}("");
         require(sent, "Failed to send Ether");
 
     lastlottocount++;
+
+    lastwinners.push(players[index]);
     
 
-    players[index] = lastwinner;
+    
     
 
     emit winner (players[index], address(this).balance);
    
    
   //this line resets the lottery by resetting the array to 0
+    timetopickwinner = block.timestamp + 10 minutes;
     players = new address payable [](0);
 
     
 }
 
 function returnlastprize () external view returns (uint){
-return prizes[lastlottocount];
+return prizes[lastlottocount -1];
 
 }
 
-function returnlastwinner () external view returns (address) {
-    return lastwinner;
+function returnlastwinner () external view returns (address payable) {
+return lastwinners[lastlottocount -1];
+}
+
+
+function Timeleft () external view returns (uint){
+
+    return timetopickwinner-block.timestamp;
 }
 
 
@@ -186,6 +200,8 @@ function returnlastwinner () external view returns (address) {
 
 
 }
+
+
 
 
 
